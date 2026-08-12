@@ -1,0 +1,60 @@
+<RoundedButton@Button>:
+    bg_color: 1, 1, 1, 1
+    background_color: 0, 0, 0, 0
+    background_normal: ''
+    background_down: ''
+    canvas.before:
+        Color:
+            rgba: self.bg_color
+        RoundedRectangle:
+            pos: self.pos
+            size: self.size
+            radius: [25]
+
+<AssistantLayout>:
+    canvas.before:
+        Color:
+            rgba: 0.04, 0.05, 0.09, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    orientation: 'vertical'
+    padding: 40
+    spacing: 20
+
+    Label:
+        id: status_label
+        text: "Ready"
+        font_size: 22
+        color: 0.85, 0.87, 0.95, 1
+        bold: True
+        size_hint_y: 0.12
+
+    WaveformWidget:
+        id: waveform
+        size_hint_y: 0.45
+
+    RoundedButton:
+        id: call_btn
+        text: "Start Call"
+        font_size: 17
+        bg_color: 0.16, 0.55, 0.35, 1
+        color: 1, 1, 1, 1
+        size_hint_y: 0.13
+
+    RoundedButton:
+        id: pause_btn
+        text: "Pause"
+        font_size: 15
+        bg_color: 0.3, 0.3, 0.35, 1
+        color: 0.8, 0.8, 0.8, 1
+        size_hint_y: 0.1
+        disabled: True
+
+    Label:
+        id: result_label
+        text: ""
+        font_size: 13
+        color: 0.6, 0.65, 0.75, 1
+        size_hint_y: 0.18

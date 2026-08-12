@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+vosk-model-en-us-0.22/
+piper_voices/
+*.onnx
+scan_report.json
+assistant_memory.json
+build/
+dist/
+*.spec
+.kivy/
