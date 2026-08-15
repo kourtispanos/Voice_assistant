@@ -15,24 +15,24 @@ Built with Python, Kivy, Whisper, Ollama, and Piper TTS
 
 ---
 
-## ✨ Features
+##  Features
 
 | | |
 |---|---|
-| 🎙️ **Wake word activation** | Say *"assistant"* to start a conversation — no button required |
-| 🗣️ **Offline speech recognition** | Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — no internet, no API costs |
-| 🔊 **Natural offline voice** | [Piper TTS](https://github.com/rhasspy/piper) neural voice, not a robotic system voice |
-| 🤖 **Local AI conversation** | Runs on [Ollama](https://ollama.com) — no API key, no subscription |
-| 🖥️ **App control** | *"open chrome"*, *"close steam"* |
-| 🖱️ **Computer control** | Scroll, click, screenshot, type — and click on-screen elements by name using OCR |
-| 🔍 **Network scanner** | *"scan the network"* — live host discovery + port scan with risk flagging |
-| 🌊 **Animated waveform UI** | Built with Kivy, reacts visually while speaking |
-| 🔔 **System tray support** | Runs quietly in the background instead of closing |
-| ⏰ **Time-aware greeting** | Greets you differently depending on time of day |
+|  **Wake word activation** | Say *"assistant"* to start a conversation — no button required |
+|  **Offline speech recognition** | Powered by [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — no internet, no API costs |
+|  **Natural offline voice** | [Piper TTS](https://github.com/rhasspy/piper) neural voice, not a robotic system voice |
+|  **Local AI conversation** | Runs on [Ollama](https://ollama.com) — no API key, no subscription |
+|  **App control** | *"open chrome"*, *"close steam"* |
+|  **Computer control** | Scroll, click, screenshot, type — and click on-screen elements by name using OCR |
+|  **Network scanner** | *"scan the network"* — live host discovery + port scan with risk flagging |
+|  **Animated waveform UI** | Built with Kivy, reacts visually while speaking |
+|  **System tray support** | Runs quietly in the background instead of closing |
+|  **Time-aware greeting** | Greets you differently depending on time of day |
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 | Purpose | Library |
 |---|---|
@@ -46,7 +46,7 @@ Built with Python, Kivy, Whisper, Ollama, and Piper TTS
 
 ---
 
-## 🚀 Setup
+##  Setup
 
 ### 1. Prerequisites
 
@@ -85,11 +85,11 @@ APP_MAP = {
 python main.py
 ```
 
-> ⚠️ Network scanning requires **administrator privileges** — right-click your terminal and "Run as administrator" before launching.
+>  Network scanning requires **administrator privileges** — right-click your terminal and "Run as administrator" before launching.
 
 ---
 
-## 🎯 Usage
+##  Usage
 
 1. Launch the app — it listens quietly for the wake word (*"assistant"*)
 2. Say **"assistant"** to start a conversation
@@ -104,7 +104,7 @@ python main.py
 
 ---
 
-## 🔁 Run on startup (Windows)
+##  Run on startup (Windows)
 
 A `start_assistant.bat` script is included.
 
@@ -114,7 +114,7 @@ A `start_assistant.bat` script is included.
 
 ---
 
-## ⚠️ Known Limitations
+##  Known Limitations
 
 - **No standalone `.exe` yet** — PyInstaller hits a persistent Kivy/GLEW DLL loading issue in frozen builds, even with Kivy's official hooks. The `.bat` launcher is the current workaround.
 - **Wake word detection is basic** — simple keyword matching, not a dedicated wake-word model. Expect occasional false positives/negatives.
@@ -124,7 +124,7 @@ A `start_assistant.bat` script is included.
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 Voice-assistant/
