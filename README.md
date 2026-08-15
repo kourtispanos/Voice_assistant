@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎙️ Voice Assistant
+#  Voice Assistant
 
 **A fully offline, voice-activated AI assistant for Windows**
 
