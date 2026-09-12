@@ -14,7 +14,7 @@ import traceback
 import pystray
 from PIL import Image
 
-from assistant_logic import speak, listen_once, handle_command, get_greeting, listen_for_wake_word, last_scan_result
+from assistant_logic import speak, listen_once, handle_command, get_greeting, listen_for_wake_word, warm_up_ollama
 
 
 def resource_path(relative_path):
@@ -76,6 +76,7 @@ class AssistantLayout(BoxLayout):
     def on_kv_post(self, base_widget):
         self.ids.call_btn.bind(on_press=self.toggle_call)
         self.ids.pause_btn.bind(on_press=self.toggle_pause)
+        threading.Thread(target=warm_up_ollama, daemon=True).start()
         threading.Thread(target=self.wake_word_loop, daemon=True).start()
 
     def set_status(self, text):
@@ -153,12 +154,11 @@ class AssistantLayout(BoxLayout):
                     self.set_status("💬 Responding...")
 
                     t1 = time.time()
-                    last_scan_result["text"] = ""
-                    response = handle_command(text)
+                    response, detail = handle_command(text)
                     print(f"[TIMING] handle_command: {time.time() - t1:.2f}s")
 
-                    if last_scan_result["text"]:
-                        self.set_result(f"You: {text}\n\nAssistant: {response}\n\n{last_scan_result['text']}")
+                    if detail:
+                        self.set_result(f"You: {text}\n\nAssistant: {response}\n\n{detail}")
                     else:
                         self.set_result(f"You: {text}\n\nAssistant: {response}")
 

@@ -42,18 +42,27 @@ logging.getLogger('httpcore').setLevel(logging.WARNING)
 logging.getLogger('httpx').setLevel(logging.WARNING)
 logging.basicConfig(level=logging.WARNING)
 
-socket.setdefaulttimeout(30)
+OLLAMA_MODEL = "qwen2.5:7b"
 
-vosk_model = vosk.Model(resource_path("vosk-model-en-us-0.22"))
+_vosk_model = None
 
-try:
-    ollama.chat(model="qwen2.5:7b", messages=[{"role": "user", "content": "hi"}])
-    print("[DEBUG] Ollama model warmed up successfully")
-except Exception as e:
-    print(f"[DEBUG] Ollama warmup failed: {e}")
+
+def get_vosk_model():
+    global _vosk_model
+    if _vosk_model is None:
+        _vosk_model = vosk.Model(resource_path("vosk-model-en-us-0.22"))
+    return _vosk_model
+
+
+def warm_up_ollama():
+    try:
+        ollama.chat(model=OLLAMA_MODEL, messages=[{"role": "user", "content": "hi"}])
+        print("[DEBUG] Ollama model warmed up successfully")
+    except Exception as e:
+        print(f"[DEBUG] Ollama warmup failed: {e}")
+
 
 conversation_history = []
-last_scan_result = {"text": ""}
 
 
 def get_greeting():
@@ -99,7 +108,7 @@ def listen_for_wake_word(chunk_duration=2):
     recording = sd.rec(int(chunk_duration * SAMPLERATE), samplerate=SAMPLERATE, channels=1, dtype='int16')
     sd.wait()
 
-    recognizer = vosk.KaldiRecognizer(vosk_model, SAMPLERATE)
+    recognizer = vosk.KaldiRecognizer(get_vosk_model(), SAMPLERATE)
     recognizer.AcceptWaveform(recording.tobytes())
     result = json.loads(recognizer.FinalResult())
     text = result.get("text", "").strip().lower()
@@ -159,6 +168,8 @@ def close_application(app_name):
 
 
 def run_network_scan():
+    """Returns (spoken_result, written_detail) — written_detail is the fuller
+    report text shown in the UI alongside the short spoken summary."""
     try:
         report = run_full_scan()
         num_devices = len(report["devices"])
@@ -178,56 +189,56 @@ def run_network_scan():
             written_result = f"Found {num_devices} devices.\nNo major risks detected — network looks safe."
             spoken_result = f"Found {num_devices} devices. No major risks detected."
 
-        last_scan_result["text"] = written_result
-        return spoken_result
+        return spoken_result, written_result
 
     except Exception as e:
-        last_scan_result["text"] = f"Scan failed: {e}"
-        return "I couldn't complete the network scan. Make sure I'm running with administrator privileges."
+        return "I couldn't complete the network scan. Make sure I'm running with administrator privileges.", f"Scan failed: {e}"
 
 
 def handle_command(text):
+    """Returns (spoken_response, detail_text). detail_text is None unless the
+    command produced extra written-only detail (e.g. a full scan report)."""
     global conversation_history
 
     text_lower = text.lower()
 
     if fuzzy_contains(text_lower, "time"):
         now = datetime.now().strftime("%H:%M")
-        return f"It's {now}"
+        return f"It's {now}", None
 
     if fuzzy_contains(text_lower, "date") or fuzzy_contains(text_lower, "today"):
         today = datetime.now().strftime("%d/%m/%Y")
-        return f"Today is {today}"
+        return f"Today is {today}", None
 
     if fuzzy_contains(text_lower, "open"):
         for app_name in APP_MAP:
             if fuzzy_contains(text_lower, app_name):
-                return open_application(app_name)
-        return "Which application should I open?"
+                return open_application(app_name), None
+        return "Which application should I open?", None
 
     if fuzzy_contains(text_lower, "close"):
         for app_name in APP_MAP:
             if fuzzy_contains(text_lower, app_name):
-                return close_application(app_name)
-        return "Which application should I close?"
+                return close_application(app_name), None
+        return "Which application should I close?", None
 
     if "scan" in text_lower.split() or "network" in text_lower:
         return run_network_scan()
 
     computer_response = handle_computer_command(text_lower, text)
     if computer_response:
-        return computer_response
+        return computer_response, None
 
     conversation_history.append({"role": "user", "content": text})
     messages = [
         {"role": "system", "content": "You are a voice assistant. Always answer in EXACTLY ONE short sentence, since your reply will be read aloud. Never use multiple sentences."}
     ] + conversation_history
 
-    response = ollama.chat(model="qwen2.5:7b", messages=messages)
+    response = ollama.chat(model=OLLAMA_MODEL, messages=messages)
     reply = response['message']['content']
 
     conversation_history.append({"role": "assistant", "content": reply})
     if len(conversation_history) > 20:
         conversation_history = conversation_history[-20:]
 
-    return reply
+    return reply, None

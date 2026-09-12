@@ -94,37 +94,46 @@ def analyze_ports(open_ports):
 
 def run_full_scan():
     """Runs the complete scan and returns a structured report."""
-    ip_range = get_local_ip_range()
-    hosts = discover_hosts(ip_range)
+    # get_hostname() below has no per-call timeout, so it relies on the
+    # socket default. Scoped to the scan itself instead of set process-wide
+    # at import time, and restored afterward so it doesn't affect unrelated
+    # network calls elsewhere in the app (ollama, whisper, etc).
+    previous_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(30)
+    try:
+        ip_range = get_local_ip_range()
+        hosts = discover_hosts(ip_range)
 
-    report = {
-        "scan_time": datetime.now().isoformat(),
-        "ip_range": ip_range,
-        "devices": []
-    }
+        report = {
+            "scan_time": datetime.now().isoformat(),
+            "ip_range": ip_range,
+            "devices": []
+        }
 
-    for host in hosts:
-        print(f"\n  IP: {host['ip']}  |  MAC: {host['mac']}  |  Name: {host['hostname']}")
-        print(f"  [*] Scanning ports...")
-        open_ports = scan_ports(host['ip'])
-        findings = analyze_ports(open_ports) if open_ports else []
+        for host in hosts:
+            print(f"\n  IP: {host['ip']}  |  MAC: {host['mac']}  |  Name: {host['hostname']}")
+            print(f"  [*] Scanning ports...")
+            open_ports = scan_ports(host['ip'])
+            findings = analyze_ports(open_ports) if open_ports else []
 
-        for f in findings:
-            if f["risk"]:
-                print(f"  [!] Port {f['port']} ({f['service']}) — RISK: {f['risk']}")
-            else:
-                print(f"  [+] Port {f['port']} ({f['service']}) — OK")
-        if not findings:
-            print(f"  [-] No common open ports found")
+            for f in findings:
+                if f["risk"]:
+                    print(f"  [!] Port {f['port']} ({f['service']}) — RISK: {f['risk']}")
+                else:
+                    print(f"  [+] Port {f['port']} ({f['service']}) — OK")
+            if not findings:
+                print(f"  [-] No common open ports found")
 
-        report["devices"].append({
-            "ip": host["ip"],
-            "mac": host["mac"],
-            "hostname": host["hostname"],
-            "open_ports": findings
-        })
+            report["devices"].append({
+                "ip": host["ip"],
+                "mac": host["mac"],
+                "hostname": host["hostname"],
+                "open_ports": findings
+            })
 
-    return report
+        return report
+    finally:
+        socket.setdefaulttimeout(previous_timeout)
 
 def save_report(report, filename="scan_report.json"):
     with open(filename, "w") as f:
