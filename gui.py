@@ -11,8 +11,6 @@ import threading
 import math
 import time
 import traceback
-import pystray
-from PIL import Image
 
 from assistant_logic import speak, listen_once, handle_command, get_greeting, listen_for_wake_word, warm_up_ollama, preload_models
 
@@ -196,7 +194,7 @@ class AssistantLayout(BoxLayout):
 
 
 class VoiceAssistantApp(App):
-    icon = 'Voice.ico'
+    icon = resource_path('Voice.ico')
 
     def build(self):
         self.title = "Voice Assistant"
@@ -207,30 +205,7 @@ class VoiceAssistantApp(App):
         Window.bind(on_request_close=self.on_request_close)
 
     def on_request_close(self, *args, **kwargs):
-        self.minimize_to_tray()
-        return True
-
-    def minimize_to_tray(self):
-        from kivy.core.window import Window
-        Window.minimize()
-        threading.Thread(target=self.setup_tray, daemon=True).start()
-
-    def setup_tray(self):
-        image = Image.open(resource_path("Voice.ico"))
-
-        def on_show(icon, item):
-            from kivy.core.window import Window
-            Window.restore()
-            icon.stop()
-
-        def on_quit(icon, item):
-            icon.stop()
-            os._exit(0)
-
-        menu = pystray.Menu(
-            pystray.MenuItem("Show", on_show, default=True),
-            pystray.MenuItem("Quit", on_quit)
-        )
-
-        tray_icon = pystray.Icon("VoiceAssistant", image, "Voice Assistant", menu)
-        tray_icon.run()
+        self.stop()
+        # Background threads may be blocked in audio or model calls; exit
+        # immediately so the process (and the exe's temp folder) go away.
+        os._exit(0)
