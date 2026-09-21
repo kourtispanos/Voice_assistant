@@ -9,4 +9,6 @@ assistant_memory.json
 build/
 dist/
 *.spec
+!voice_assistant.spec
 .kivy/
+installer/Output/
