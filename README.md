@@ -77,13 +77,13 @@ Your prompt should now show `(venv)`. Repeat the `activate` step every time you 
 ### 3. Install Python dependencies
 
 ```bash
-pip install kivy faster-whisper piper-tts vosk sounddevice numpy ollama psutil scapy pystray Pillow pyautogui pytesseract pypiwin32
+pip install -r requirements.txt
 ```
 
 ### 4. Install Ollama and pull the model
 
 - Download and install [Ollama](https://ollama.com/download)
-- In a terminal, pull the model the assistant actually uses:
+- In a terminal, pull the model the assistant uses (set by `OLLAMA_MODEL` in `config.py` — change it there if you prefer another):
   ```bash
   ollama pull qwen2.5:7b
   ```
@@ -91,7 +91,7 @@ pip install kivy faster-whisper piper-tts vosk sounddevice numpy ollama psutil s
   ```bash
   ollama list
   ```
-  `qwen2.5:7b` should be in the list. Ollama runs as a background service after install, so no need to start it manually.
+  `qwen2.5:7b` should be in the list. If `ollama list` fails to connect, the Ollama server isn't running — open the **Ollama** app from the Start Menu (it lives in the system tray) or run `ollama serve`. It has to be running whenever you use the assistant's AI answers.
 
 ### 5. Install Npcap (required for network scanning)
 
@@ -102,11 +102,7 @@ pip install kivy faster-whisper piper-tts vosk sounddevice numpy ollama psutil s
 ### 6. Install Tesseract OCR (required for "click on ___" commands)
 
 - Download the installer from [UB-Mannheim/tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
-- Install to the default path (`C:\Program Files\Tesseract-OCR\`)
-- If you install it anywhere else, you **must** update the hardcoded path near the top of `computer_control.py`:
-  ```python
-  pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-  ```
+- Install to the default path (`C:\Program Files\Tesseract-OCR\`) or add it to your `PATH` — the assistant finds it automatically in either case. If it isn't found, "click on ___" answers that Tesseract isn't installed instead of failing.
 - Verify:
   ```bash
   "C:\Program Files\Tesseract-OCR\tesseract.exe" --version
@@ -114,7 +110,7 @@ pip install kivy faster-whisper piper-tts vosk sounddevice numpy ollama psutil s
 
 ### 7. Download the Vosk wake-word model
 
-The app loads this model at startup — it will crash immediately if it's missing.
+The app loads this model in the background at startup. Without it the wake word can't work, and the window shows *"Vosk model missing"*.
 
 - Go to [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models) and download **`vosk-model-en-us-0.22`** (~1.8 GB)
 - Unzip it into the project root so the folder structure looks like:
@@ -159,8 +155,8 @@ python main.py
 > Network scanning requires **administrator privileges** — right-click your terminal (or PowerShell/CMD shortcut) and choose "Run as administrator" before activating the venv and launching. Without it, `"scan the network"` will fail silently.
 
 **Quick troubleshooting:**
-- App crashes on startup mentioning `vosk` → the model folder from step 7 is missing or misnamed
-- `"I couldn't find '...' on screen"` never works → Tesseract isn't installed, or the path in `computer_control.py` doesn't match your install location
+- Status shows *"Vosk model missing"* → the model folder from step 7 is missing or misnamed
+- `"click on ___"` says Tesseract isn't installed → install it (step 6) to the default path or add it to your `PATH`
 - `"scan the network"` returns nothing / fails → not running as administrator, or Npcap wasn't installed in WinPcap-compatible mode
 - No voice output → check that both Piper voice files from step 8 are present in `piper_voices/`
 - Ollama replies are slow or errors out → confirm `ollama list` shows `qwen2.5:7b`; a 7B model needs a reasonably capable CPU/GPU
@@ -187,7 +183,7 @@ python main.py
 The core logic (command routing, app open/close, network scan parsing, model loading) has a pytest suite that mocks out everything external — no microphone, models, Ollama, admin rights, or network access required.
 
 ```bash
-pip install pytest
+pip install -r requirements-dev.txt
 pytest
 ```
 
@@ -206,8 +202,10 @@ A `start_assistant.bat` script is included.
 ## Known Limitations
 
 - **No standalone `.exe` yet** — PyInstaller hits a persistent Kivy/GLEW DLL loading issue in frozen builds, even with Kivy's official hooks. The `.bat` launcher is the current workaround.
-- **Wake word detection is basic** — it runs a full Vosk transcription on short audio chunks and checks whether the word "assistant" appears in the result, rather than using a dedicated lightweight wake-word engine. Expect occasional false positives/negatives.
-- **Network scan requires admin rights**, and fails silently without them.
+- **Wake word detection is basic** — it runs a full Vosk transcription on short audio chunks and fuzzy-matches the result against "assistant" (so "assistance" also works), rather than using a dedicated lightweight wake-word engine. Expect occasional false positives/negatives.
+- **Ollama must be running** — the assistant doesn't start it. If AI answers fail, open the Ollama app or run `ollama serve`.
+- **First launch is slow** — the Vosk, Piper and Whisper models load in the background after the window opens, so the first "assistant" may take ~30s to be recognised.
+- **Network scan requires admin rights.** It only starts when you say "scan" together with a target such as "network" or "devices" (saying just "network" won't trigger it).
 - **OCR-based clicking** works best on clear, printed text — it can't identify icons or images without accompanying text.
 - **No persistent memory between sessions** — conversation context resets on restart.
 
@@ -225,7 +223,9 @@ Voice-assistant/
 ├── voice_output.py                  # Piper-based text-to-speech
 ├── computer_control.py              # Mouse/keyboard control + OCR-based clicking
 ├── scanner.py                       # Standalone network scanner module
-├── config.py                        # User/audio settings
+├── config.py                        # User/audio settings, model names
+├── requirements.txt                 # Runtime dependencies (pinned)
+├── requirements-dev.txt             # Adds pytest
 ├── tests/                           # pytest suite (mocks all external dependencies)
 ├── conftest.py                      # Shared pytest fixtures
 ├── pytest.ini                       # pytest configuration
