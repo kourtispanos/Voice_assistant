@@ -50,12 +50,39 @@ class FakePortSocket:
     def close(self):
         pass
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        return False
+
 
 def test_scan_ports(monkeypatch):
     open_ports = {22, 443}
     monkeypatch.setattr(scanner.socket, "socket", lambda *a, **k: FakePortSocket(open_ports))
     result = scanner.scan_ports("192.168.1.5", ports=[21, 22, 443, 3389])
     assert result == [22, 443]
+
+
+def test_scan_ports_with_no_ports_returns_empty():
+    assert scanner.scan_ports("192.168.1.5", ports=[]) == []
+
+
+def test_is_port_open_closes_socket_even_when_connect_raises(monkeypatch):
+    closed = []
+
+    class ExplodingSocket(FakePortSocket):
+        def connect_ex(self, addr):
+            raise OSError("network down")
+
+        def close(self):
+            closed.append(True)
+
+    monkeypatch.setattr(scanner.socket, "socket", lambda *a, **k: ExplodingSocket(set()))
+    with pytest.raises(OSError):
+        scanner.is_port_open("192.168.1.5", 80)
+    assert closed == [True]
 
 
 def test_analyze_ports_flags_risky_and_safe():

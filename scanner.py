@@ -1,6 +1,7 @@
 import socket
 import ipaddress
 import json
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from scapy.all import ARP, Ether, srp
 
@@ -43,19 +44,20 @@ def discover_hosts(ip_range):
 
 COMMON_PORTS = [21, 22, 23, 25, 53, 80, 110, 135, 139, 443, 445, 3306, 3389, 8080]
 
-def scan_ports(ip, ports=COMMON_PORTS, timeout=0.5):
-    """Checks which of the given ports are open on the target IP."""
-    open_ports = []
-
-    for port in ports:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+def is_port_open(ip, port, timeout=0.5):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(timeout)
-        result = sock.connect_ex((ip, port))
-        if result == 0:
-            open_ports.append(port)
-        sock.close()
+        return sock.connect_ex((ip, port)) == 0
 
-    return open_ports
+
+def scan_ports(ip, ports=COMMON_PORTS, timeout=0.5):
+    """Checks which of the given ports are open on the target IP.
+    Ports are probed in parallel; results keep the order of `ports`."""
+    if not ports:
+        return []
+    with ThreadPoolExecutor(max_workers=len(ports)) as pool:
+        results = list(pool.map(lambda p: is_port_open(ip, p, timeout), ports))
+    return [port for port, is_open in zip(ports, results) if is_open]
 
 PORT_SERVICES = {
     21: "FTP",
