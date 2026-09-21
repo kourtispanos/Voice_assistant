@@ -27,7 +27,6 @@ Built with Python, Kivy, Whisper, Vosk, Ollama, and Piper TTS
 | **Computer control** | Scroll, click, screenshot, type — and click on-screen elements by name using OCR |
 | **Network scanner** | *"scan the network"* — live host discovery + port scan with risk flagging |
 | **Animated waveform UI** | Built with Kivy, reacts visually while speaking |
-| **System tray support** | Runs quietly in the background instead of closing |
 | **Time-aware greeting** | Greets you differently depending on time of day |
 
 ---
@@ -43,11 +42,24 @@ Built with Python, Kivy, Whisper, Vosk, Ollama, and Piper TTS
 | AI conversation | [Ollama](https://ollama.com) *(Qwen2.5)* |
 | Network scanning | [scapy](https://scapy.net/) |
 | Computer control | [PyAutoGUI](https://pyautogui.readthedocs.io/) + [pytesseract](https://github.com/madmaze/pytesseract) *(OCR)* |
-| System tray | [pystray](https://pypi.org/project/pystray/) |
 
 ---
 
-## Setup
+## Install (Windows installer)
+
+The easiest way: download **`VoiceAssistant-Setup-1.0.0.exe`** from the [latest release](https://github.com/kourtispanos/Voice_assistant/releases/latest) and run it.
+
+- It installs the app for your user account (no administrator rights needed), with Start Menu / desktop shortcuts and an optional "start with Windows".
+- It downloads the speech and voice models it needs (~2.4 GB: Vosk, Whisper, Piper) with integrity checks, so you need an internet connection and ~5 GB free during setup.
+- It can optionally download and install Tesseract OCR for you (used by "click on ___").
+- You still install **Ollama** yourself ([ollama.com/download](https://ollama.com/download), then `ollama pull qwen2.5:7b`) and, for network scans, **Npcap** — the installer reminds you.
+- Closing the window quits the assistant. Uninstall from Windows *Settings → Apps*.
+
+Prefer to run from source, or want to change the code? Use the manual setup below.
+
+---
+
+## Setup (from source)
 
 Follow these in order — several steps depend on the previous one (e.g. the app won't even launch without the Vosk model in place).
 
@@ -174,7 +186,7 @@ python main.py
    - `"click on subscribe"` *— finds and clicks on-screen text via OCR*
    - `"scroll down"` / `"take a screenshot"` / `"type hello world"`
 4. Say **"stop"** or **"goodbye"**, or press **End Call**, to return to standby
-5. Closing the window minimizes it to the system tray — right-click the tray icon to fully quit
+5. Closing the window quits the assistant
 
 ---
 
@@ -189,9 +201,24 @@ pytest
 
 ---
 
-## Run on startup (Windows)
+## Building the exe and installer
 
-A `start_assistant.bat` script is included.
+Needs the source setup above, PyInstaller and [Inno Setup 6](https://jrsoftware.org/isinfo.php).
+
+```bash
+pip install pyinstaller
+set BUNDLE_MODELS=0
+pyinstaller voice_assistant.spec --noconfirm
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\voice_assistant.iss
+```
+
+The installer is written to `installer\Output\`. It is small (~170 MB) because the models are downloaded during setup — bundled, they would exceed GitHub's 2 GiB limit per release file.
+
+---
+
+## Run on startup (from source)
+
+The installer has a "start with Windows" option. When running from source, a `start_assistant.bat` script is included.
 
 1. Right-click `start_assistant.bat` → **Create shortcut**
 2. Press `Win + R`, type `shell:startup`, hit Enter
@@ -201,7 +228,7 @@ A `start_assistant.bat` script is included.
 
 ## Known Limitations
 
-- **No standalone `.exe` yet** — PyInstaller hits a persistent Kivy/GLEW DLL loading issue in frozen builds, even with Kivy's official hooks. The `.bat` launcher is the current workaround.
+- **The exe uses Kivy's SDL2 OpenGL backend** — the default GLEW backend fails to load its DLL inside a PyInstaller build, so `main.py` switches backend when frozen. The exe is a single file and unpacks itself on start, so it takes a few seconds to open.
 - **Wake word detection is basic** — it runs a full Vosk transcription on short audio chunks and fuzzy-matches the result against "assistant" (so "assistance" also works), rather than using a dedicated lightweight wake-word engine. Expect occasional false positives/negatives.
 - **Ollama must be running** — the assistant doesn't start it. If AI answers fail, open the Ollama app or run `ollama serve`.
 - **First launch is slow** — the Vosk, Piper and Whisper models load in the background after the window opens, so the first "assistant" may take ~30s to be recognised.
@@ -216,7 +243,7 @@ A `start_assistant.bat` script is included.
 ```
 Voice-assistant/
 ├── main.py                          # Entry point
-├── gui.py                           # Kivy UI, waveform animation, tray icon
+├── gui.py                           # Kivy UI, waveform animation
 ├── gui.kv                           # Kivy layout definition
 ├── assistant_logic.py               # Core command routing, AI, app control, network scan
 ├── speech_recognition_module.py     # Whisper-based speech-to-text
@@ -229,7 +256,9 @@ Voice-assistant/
 ├── tests/                           # pytest suite (mocks all external dependencies)
 ├── conftest.py                      # Shared pytest fixtures
 ├── pytest.ini                       # pytest configuration
-├── start_assistant.bat              # Startup launcher
+├── voice_assistant.spec             # PyInstaller build definition (single-file exe)
+├── installer/                       # Inno Setup script for the Windows installer
+├── start_assistant.bat              # Startup launcher (running from source)
 ├── Voice.ico                        # App icon
 ├── piper_voices/                    # Piper TTS voice model (not tracked in git)
 └── vosk-model-en-us-0.22/           # Vosk wake-word model (not tracked in git)
