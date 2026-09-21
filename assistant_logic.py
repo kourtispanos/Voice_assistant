@@ -10,7 +10,7 @@ import vosk
 import sys
 import threading
 from datetime import datetime
-from config import USERNAME, SAMPLERATE, CHUNK_DURATION, OLLAMA_MODEL, VOSK_MODEL_DIR
+from config import USERNAME, SAMPLERATE, CHUNK_DURATION, OLLAMA_MODEL, VOSK_MODEL_DIR, data_path
 import ollama
 from scanner import run_full_scan
 from difflib import SequenceMatcher
@@ -55,7 +55,7 @@ def get_vosk_model():
     global _vosk_model
     with _vosk_lock:
         if _vosk_model is None:
-            model_path = resource_path(VOSK_MODEL_DIR)
+            model_path = data_path(VOSK_MODEL_DIR)
             if not os.path.isdir(model_path):
                 raise FileNotFoundError(
                     f"Vosk model not found at {model_path}. Download "

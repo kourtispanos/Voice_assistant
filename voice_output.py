@@ -1,10 +1,11 @@
 import os
 import threading
 from piper import PiperVoice
+from config import data_path
 import sounddevice as sd
 import numpy as np
 
-VOICE_MODEL_PATH = "piper_voices/en_GB-jenny_dioco-medium.onnx"
+VOICE_MODEL_PATH = data_path("piper_voices/en_GB-jenny_dioco-medium.onnx")
 
 _piper_voice = None
 _piper_lock = threading.Lock()

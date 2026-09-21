@@ -1,7 +1,10 @@
+import os
 import threading
 from faster_whisper import WhisperModel
+from config import data_path
 
 WHISPER_MODEL_SIZE = "small"
+BUNDLED_WHISPER_DIR = "whisper-small"
 
 _whisper_model = None
 _whisper_lock = threading.Lock()
@@ -11,7 +14,10 @@ def get_whisper_model():
     global _whisper_model
     with _whisper_lock:
         if _whisper_model is None:
-            _whisper_model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type="int8")
+            # A local copy (installed by the installer) avoids the first-run download.
+            bundled = data_path(BUNDLED_WHISPER_DIR)
+            model_id = bundled if os.path.isdir(bundled) else WHISPER_MODEL_SIZE
+            _whisper_model = WhisperModel(model_id, device="cpu", compute_type="int8")
             print("[DEBUG] Whisper loaded on CPU")
     return _whisper_model
 
