@@ -1,3 +1,5 @@
+import os
+import threading
 from piper import PiperVoice
 import sounddevice as sd
 import numpy as np
@@ -5,12 +7,19 @@ import numpy as np
 VOICE_MODEL_PATH = "piper_voices/en_GB-jenny_dioco-medium.onnx"
 
 _piper_voice = None
+_piper_lock = threading.Lock()
 
 
 def get_piper_voice():
     global _piper_voice
-    if _piper_voice is None:
-        _piper_voice = PiperVoice.load(VOICE_MODEL_PATH)
+    with _piper_lock:
+        if _piper_voice is None:
+            if not os.path.exists(VOICE_MODEL_PATH):
+                raise FileNotFoundError(
+                    f"Piper voice not found at {VOICE_MODEL_PATH}. Download the "
+                    f".onnx and .onnx.json files into piper_voices/ (README, step 8)."
+                )
+            _piper_voice = PiperVoice.load(VOICE_MODEL_PATH)
     return _piper_voice
 
 

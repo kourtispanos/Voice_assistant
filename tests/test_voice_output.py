@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import voice_output as vo
 
@@ -32,6 +33,7 @@ def test_get_piper_voice_is_lazy_and_cached(monkeypatch):
             return FakePiperVoice([])
 
     monkeypatch.setattr(vo, "PiperVoice", FakeCtor)
+    monkeypatch.setattr(vo.os.path, "exists", lambda p: True)
     assert vo._piper_voice is None
 
     first = vo.get_piper_voice()
@@ -68,3 +70,9 @@ def test_speak_piper_no_audio_does_not_play(monkeypatch):
 
     vo.speak_piper("")
     assert calls == []
+
+
+def test_get_piper_voice_missing_file_gives_clear_error(monkeypatch):
+    monkeypatch.setattr(vo.os.path, "exists", lambda p: False)
+    with pytest.raises(FileNotFoundError, match="Piper voice not found"):
+        vo.get_piper_voice()

@@ -1,15 +1,18 @@
+import threading
 from faster_whisper import WhisperModel
 
+WHISPER_MODEL_SIZE = "small"
+
 _whisper_model = None
+_whisper_lock = threading.Lock()
 
 
 def get_whisper_model():
     global _whisper_model
-    if _whisper_model is None:
-        # "base" is a good balance of speed/accuracy. Options: tiny, base, small, medium, large-v3
-        # device="cuda" uses your GPU (much faster); falls back to "cpu" if unavailable
-        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
-        print("[DEBUG] Whisper loaded on CPU")
+    with _whisper_lock:
+        if _whisper_model is None:
+            _whisper_model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type="int8")
+            print("[DEBUG] Whisper loaded on CPU")
     return _whisper_model
 
 
