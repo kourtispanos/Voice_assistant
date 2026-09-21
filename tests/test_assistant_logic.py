@@ -10,8 +10,23 @@ def test_fuzzy_contains_exact_match():
     assert assistant_logic.fuzzy_contains("what time is it", "time")
 
 
-def test_fuzzy_contains_typo_match():
-    assert assistant_logic.fuzzy_contains("whats the tyme", "time")
+def test_fuzzy_contains_typo_match_on_longer_word():
+    assert assistant_logic.fuzzy_contains("open notepd", "notepad")
+
+
+@pytest.mark.parametrize("text,keyword", [
+    ("tell me about the latest data", "date"),
+    ("update the software", "date"),
+    ("click on subscribe", "open"),
+    ("tell me a fact", "time"),
+])
+def test_fuzzy_contains_rejects_lookalike_short_words(text, keyword):
+    assert not assistant_logic.fuzzy_contains(text, keyword)
+
+
+def test_fuzzy_contains_ignores_punctuation():
+    assert assistant_logic.fuzzy_contains("What time is it?", "time")
+    assert assistant_logic.fuzzy_contains("Open VM.", "vm")
 
 
 def test_fuzzy_contains_no_match():
@@ -165,6 +180,38 @@ def test_handle_command_routes_scan_keyword(monkeypatch):
     assert detail == "detail text"
 
 
+def test_the_word_network_alone_does_not_start_a_scan(monkeypatch):
+    def fail():
+        raise AssertionError("scan must not run")
+
+    monkeypatch.setattr(assistant_logic, "run_network_scan", fail)
+    monkeypatch.setattr(assistant_logic, "handle_computer_command", lambda lower, orig: None)
+    monkeypatch.setattr(assistant_logic.ollama, "chat", lambda model, messages: {"message": {"content": "an answer"}})
+    response, detail = assistant_logic.handle_command("what is a neural network")
+    assert response == "an answer"
+
+
+def test_scan_without_a_target_asks_what_to_scan(monkeypatch):
+    def fail():
+        raise AssertionError("scan must not run")
+
+    monkeypatch.setattr(assistant_logic, "run_network_scan", fail)
+    response, detail = assistant_logic.handle_command("scan")
+    assert "What should I scan" in response
+    assert detail is None
+
+
+@pytest.mark.parametrize("heard,expected", [
+    ("assistant", True),
+    ("assistance", True),
+    ("hey assistant", True),
+    ("", False),
+    ("the weather today", False),
+])
+def test_matches_wake_word(heard, expected):
+    assert assistant_logic.matches_wake_word(heard) is expected
+
+
 def test_handle_command_delegates_to_computer_control(monkeypatch):
     monkeypatch.setattr(assistant_logic, "handle_computer_command", lambda lower, orig: "Scrolled down")
     response, detail = assistant_logic.handle_command("scroll down")
@@ -208,6 +255,7 @@ def test_get_vosk_model_is_lazy_and_cached(monkeypatch):
             calls.append(path)
 
     monkeypatch.setattr(assistant_logic.vosk, "Model", FakeVoskModel)
+    monkeypatch.setattr(assistant_logic.os.path, "isdir", lambda p: True)
     assert assistant_logic._vosk_model is None
 
     first = assistant_logic.get_vosk_model()
@@ -223,3 +271,34 @@ def test_warm_up_ollama_swallows_errors(monkeypatch):
 
     monkeypatch.setattr(assistant_logic.ollama, "chat", fake_chat)
     assistant_logic.warm_up_ollama()  # must not raise
+
+
+def test_click_on_is_not_hijacked_by_open_command(monkeypatch):
+    # "on" fuzzy-matches "open" (0.67), which used to swallow "click on ..."
+    monkeypatch.setattr(assistant_logic, "handle_computer_command", lambda lower, orig: "clicked it")
+    response, detail = assistant_logic.handle_command("Click on subscribe.")
+    assert response == "clicked it"
+    assert detail is None
+
+
+def test_preload_models_loads_all_three(monkeypatch):
+    loaded = []
+    monkeypatch.setattr(assistant_logic, "get_vosk_model", lambda: loaded.append("vosk"))
+    monkeypatch.setattr(assistant_logic, "get_piper_voice", lambda: loaded.append("piper"))
+    monkeypatch.setattr(assistant_logic, "get_whisper_model", lambda: loaded.append("whisper"))
+    assistant_logic.preload_models()
+    assert loaded == ["vosk", "piper", "whisper"]
+
+
+def test_preload_models_swallows_errors(monkeypatch):
+    def boom():
+        raise FileNotFoundError("model missing")
+
+    monkeypatch.setattr(assistant_logic, "get_vosk_model", boom)
+    assistant_logic.preload_models()  # must not raise
+
+
+def test_get_vosk_model_missing_folder_gives_clear_error(monkeypatch):
+    monkeypatch.setattr(assistant_logic.os.path, "isdir", lambda p: False)
+    with pytest.raises(FileNotFoundError, match="Vosk model not found"):
+        assistant_logic.get_vosk_model()

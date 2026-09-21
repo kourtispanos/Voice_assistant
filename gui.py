@@ -14,7 +14,7 @@ import traceback
 import pystray
 from PIL import Image
 
-from assistant_logic import speak, listen_once, handle_command, get_greeting, listen_for_wake_word, warm_up_ollama
+from assistant_logic import speak, listen_once, handle_command, get_greeting, listen_for_wake_word, warm_up_ollama, preload_models
 
 
 def resource_path(relative_path):
@@ -76,6 +76,7 @@ class AssistantLayout(BoxLayout):
     def on_kv_post(self, base_widget):
         self.ids.call_btn.bind(on_press=self.toggle_call)
         self.ids.pause_btn.bind(on_press=self.toggle_pause)
+        threading.Thread(target=preload_models, daemon=True).start()
         threading.Thread(target=warm_up_ollama, daemon=True).start()
         threading.Thread(target=self.wake_word_loop, daemon=True).start()
 
@@ -90,7 +91,16 @@ class AssistantLayout(BoxLayout):
         while True:
             if not call_active and not is_paused:
                 self.set_status("😴 Say 'assistant' to wake me")
-                detected = listen_for_wake_word()
+                try:
+                    detected = listen_for_wake_word()
+                except FileNotFoundError as e:
+                    print(f"[ERROR] {e}")
+                    self.set_status("⚠️ Vosk model missing, see README")
+                    return
+                except Exception as e:
+                    print(f"[ERROR] Wake word listening failed: {e}")
+                    time.sleep(1)
+                    continue
                 if detected and not call_active:
                     call_active = True
                     self.ids.call_btn.text = "End Call"

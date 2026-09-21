@@ -3,27 +3,39 @@ import numpy as np
 import os
 import subprocess
 import psutil
-import socket
 import logging
 import time
 import json
 import vosk
-import pyttsx3
 import sys
+import threading
 from datetime import datetime
-from config import USERNAME, SAMPLERATE, CHUNK_DURATION
+from config import USERNAME, SAMPLERATE, CHUNK_DURATION, OLLAMA_MODEL, VOSK_MODEL_DIR
 import ollama
 from scanner import run_full_scan
 from difflib import SequenceMatcher
 from computer_control import handle_computer_command
-from speech_recognition_module import transcribe_audio
-from voice_output import speak_piper
+from speech_recognition_module import transcribe_audio, get_whisper_model
+from voice_output import speak_piper, get_piper_voice
 
-def fuzzy_contains(text, keyword, threshold=0.65):
-    words = text.lower().split()
-    for word in words:
-        similarity = SequenceMatcher(None, word, keyword).ratio()
-        if similarity >= threshold:
+_PUNCTUATION = ".,!?;:'\"()"
+
+# Short words differ by a large fraction of their length with a single
+# character ("data" vs "date" = 0.75), so they need a stricter threshold.
+SHORT_WORD_LEN = 5
+SHORT_WORD_THRESHOLD = 0.85
+LONG_WORD_THRESHOLD = 0.75
+
+
+def split_words(text):
+    return [w for w in (word.strip(_PUNCTUATION) for word in text.lower().split()) if w]
+
+
+def fuzzy_contains(text, keyword, threshold=None):
+    if threshold is None:
+        threshold = SHORT_WORD_THRESHOLD if len(keyword) <= SHORT_WORD_LEN else LONG_WORD_THRESHOLD
+    for word in split_words(text):
+        if SequenceMatcher(None, word, keyword).ratio() >= threshold:
             return True
     return False
 
@@ -42,16 +54,35 @@ logging.getLogger('httpcore').setLevel(logging.WARNING)
 logging.getLogger('httpx').setLevel(logging.WARNING)
 logging.basicConfig(level=logging.WARNING)
 
-OLLAMA_MODEL = "qwen2.5:7b"
-
 _vosk_model = None
+_vosk_lock = threading.Lock()
 
 
 def get_vosk_model():
     global _vosk_model
-    if _vosk_model is None:
-        _vosk_model = vosk.Model(resource_path("vosk-model-en-us-0.22"))
+    with _vosk_lock:
+        if _vosk_model is None:
+            model_path = resource_path(VOSK_MODEL_DIR)
+            if not os.path.isdir(model_path):
+                raise FileNotFoundError(
+                    f"Vosk model not found at {model_path}. Download "
+                    f"{VOSK_MODEL_DIR} from https://alphacephei.com/vosk/models "
+                    f"and unzip it into the project folder (README, step 7)."
+                )
+            _vosk_model = vosk.Model(model_path)
     return _vosk_model
+
+
+def preload_models():
+    """Loads the heavy models in the background so the first wake word /
+    reply doesn't pay the load cost. Vosk first, since wake word needs it."""
+    try:
+        get_vosk_model()
+        get_piper_voice()
+        get_whisper_model()
+        print("[DEBUG] Models preloaded")
+    except Exception as e:
+        print(f"[DEBUG] Model preload failed: {e}")
 
 
 def warm_up_ollama():
@@ -102,6 +133,15 @@ def listen_once():
     return text
 
 WAKE_WORD = "assistant"
+# Vosk often hears "assistance" for "assistant" (ratio ~0.84).
+WAKE_WORD_THRESHOLD = 0.8
+
+
+def matches_wake_word(text):
+    return any(
+        SequenceMatcher(None, word, WAKE_WORD).ratio() >= WAKE_WORD_THRESHOLD
+        for word in split_words(text)
+    )
 
 
 def listen_for_wake_word(chunk_duration=2):
@@ -111,11 +151,9 @@ def listen_for_wake_word(chunk_duration=2):
     recognizer = vosk.KaldiRecognizer(get_vosk_model(), SAMPLERATE)
     recognizer.AcceptWaveform(recording.tobytes())
     result = json.loads(recognizer.FinalResult())
-    text = result.get("text", "").strip().lower()
+    text = result.get("text", "")
 
-    if WAKE_WORD in text:
-        return True
-    return False
+    return matches_wake_word(text)
 
 
 APP_MAP = {
@@ -195,12 +233,21 @@ def run_network_scan():
         return "I couldn't complete the network scan. Make sure I'm running with administrator privileges.", f"Scan failed: {e}"
 
 
+SCAN_TARGETS = ("network", "networks", "lan", "wifi", "devices", "ports")
+
+
 def handle_command(text):
     """Returns (spoken_response, detail_text). detail_text is None unless the
     command produced extra written-only detail (e.g. a full scan report)."""
     global conversation_history
 
     text_lower = text.lower()
+
+    # Checked first: fuzzy matching below is loose enough that e.g. the "on"
+    # in "click on subscribe" matches "open" and hijacks the command.
+    computer_response = handle_computer_command(text_lower, text)
+    if computer_response:
+        return computer_response, None
 
     if fuzzy_contains(text_lower, "time"):
         now = datetime.now().strftime("%H:%M")
@@ -222,12 +269,13 @@ def handle_command(text):
                 return close_application(app_name), None
         return "Which application should I close?", None
 
-    if "scan" in text_lower.split() or "network" in text_lower:
-        return run_network_scan()
-
-    computer_response = handle_computer_command(text_lower, text)
-    if computer_response:
-        return computer_response, None
+    # A full ARP + port scan is slow, so it needs both a verb and an object:
+    # "what is a neural network" must not trigger one.
+    words = split_words(text_lower)
+    if "scan" in words:
+        if any(target in words for target in SCAN_TARGETS):
+            return run_network_scan()
+        return "What should I scan? Say scan the network.", None
 
     conversation_history.append({"role": "user", "content": text})
     messages = [
