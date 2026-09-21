@@ -20,22 +20,15 @@ from voice_output import speak_piper, get_piper_voice
 
 _PUNCTUATION = ".,!?;:'\"()"
 
-# Short words differ by a large fraction of their length with a single
-# character ("data" vs "date" = 0.75), so they need a stricter threshold.
-SHORT_WORD_LEN = 5
-SHORT_WORD_THRESHOLD = 0.85
-LONG_WORD_THRESHOLD = 0.75
-
-
 def split_words(text):
     return [w for w in (word.strip(_PUNCTUATION) for word in text.lower().split()) if w]
 
 
-def fuzzy_contains(text, keyword, threshold=None):
-    if threshold is None:
-        threshold = SHORT_WORD_THRESHOLD if len(keyword) <= SHORT_WORD_LEN else LONG_WORD_THRESHOLD
-    for word in split_words(text):
-        if SequenceMatcher(None, word, keyword).ratio() >= threshold:
+def fuzzy_contains(text, keyword, threshold=0.65):
+    words = text.lower().split()
+    for word in words:
+        similarity = SequenceMatcher(None, word, keyword).ratio()
+        if similarity >= threshold:
             return True
     return False
 

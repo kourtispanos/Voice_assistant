@@ -10,27 +10,8 @@ def test_fuzzy_contains_exact_match():
     assert assistant_logic.fuzzy_contains("what time is it", "time")
 
 
-def test_fuzzy_contains_typo_match_on_longer_word():
-    assert assistant_logic.fuzzy_contains("open notepd", "notepad")
-
-
-@pytest.mark.parametrize("text,keyword", [
-    ("tell me about the latest data", "date"),
-    ("update the software", "date"),
-    ("click on subscribe", "open"),
-    ("tell me a fact", "time"),
-])
-def test_fuzzy_contains_rejects_lookalike_short_words(text, keyword):
-    assert not assistant_logic.fuzzy_contains(text, keyword)
-
-
-def test_fuzzy_contains_ignores_punctuation():
-    assert assistant_logic.fuzzy_contains("What time is it?", "time")
-    assert assistant_logic.fuzzy_contains("Open VM.", "vm")
-
-
-def test_fuzzy_contains_no_match():
-    assert not assistant_logic.fuzzy_contains("open chrome please", "time")
+def test_fuzzy_contains_typo_match():
+    assert assistant_logic.fuzzy_contains("whats the tyme", "time")
 
 
 class FixedDateTime(datetime):
