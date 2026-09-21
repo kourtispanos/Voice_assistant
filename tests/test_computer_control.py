@@ -101,3 +101,29 @@ def test_handle_computer_command_type(monkeypatch):
 
 def test_handle_computer_command_unmatched_returns_none():
     assert cc.handle_computer_command("tell me a joke", "tell me a joke") is None
+
+
+def test_smart_click_reports_missing_tesseract(monkeypatch):
+    def raise_missing(img, output_type):
+        raise cc.pytesseract.TesseractNotFoundError()
+
+    monkeypatch.setattr(cc.pyautogui, "screenshot", lambda: object())
+    monkeypatch.setattr(cc.pytesseract, "image_to_data", raise_missing)
+    assert "Tesseract OCR isn't installed" in cc.smart_click("subscribe")
+
+
+def test_find_tesseract_prefers_path(monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda name: r"D:\tools\tesseract.exe")
+    assert cc.find_tesseract() == r"D:\tools\tesseract.exe"
+
+
+def test_find_tesseract_falls_back_to_default_paths(monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cc.os.path, "exists", lambda p: p == cc._TESSERACT_DEFAULT_PATHS[1])
+    assert cc.find_tesseract() == cc._TESSERACT_DEFAULT_PATHS[1]
+
+
+def test_find_tesseract_returns_none_when_missing(monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cc.os.path, "exists", lambda p: False)
+    assert cc.find_tesseract() is None

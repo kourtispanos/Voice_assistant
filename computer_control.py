@@ -1,10 +1,29 @@
 import pyautogui
 import os
 from datetime import datetime
+import shutil
 import pytesseract
 from difflib import SequenceMatcher
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+_TESSERACT_DEFAULT_PATHS = (
+    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+)
+
+
+def find_tesseract():
+    found = shutil.which("tesseract")
+    if found:
+        return found
+    for path in _TESSERACT_DEFAULT_PATHS:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+_tesseract_path = find_tesseract()
+if _tesseract_path:
+    pytesseract.pytesseract.tesseract_cmd = _tesseract_path
 
 
 def scroll_down():
@@ -38,7 +57,10 @@ def type_text(text_to_type):
 def smart_click(target_text):
     """Takes a screenshot, finds text matching target_text via OCR, and clicks it."""
     screenshot = pyautogui.screenshot()
-    data = pytesseract.image_to_data(screenshot, output_type=pytesseract.Output.DICT)
+    try:
+        data = pytesseract.image_to_data(screenshot, output_type=pytesseract.Output.DICT)
+    except pytesseract.TesseractNotFoundError:
+        return "Tesseract OCR isn't installed, so I can't find things on the screen"
 
     best_match = None
     best_score = 0
