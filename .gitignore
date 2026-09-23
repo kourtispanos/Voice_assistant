@@ -12,3 +12,4 @@ dist/
 !voice_assistant.spec
 .kivy/
 installer/Output/
+.idea/
